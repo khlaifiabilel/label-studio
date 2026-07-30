@@ -3,7 +3,7 @@ title: Audio Classification with Segments
 type: templates
 category: Audio/Speech Processing
 cat: audio-speech-processing
-order: 308
+order: 335
 meta_title: Audio Classification with Segments Data Labeling Template
 meta_description: Template for classifying audio regions for segmentation tasks with Label Studio for your machine learning and data science projects.
 ---
@@ -11,6 +11,11 @@ meta_description: Template for classifying audio regions for segmentation tasks 
 <img src="/images/templates-misc/audio-classification-segments.png" alt="" class="gif-border" width="598.4px" height="319.2px" />
 
 If you want to perform audio classification tasks on specific segments of audio clips, you can use this template to listen to an audio file and classify the topic of the clip.
+
+!!! error Enterprise
+    If you're managing more complex or high-volume audio labeling projects, Label Studio Enterprise includes an advanced audio transcription interface built to support faster, more precise annotation at scale.
+
+    See our new [Multi-Channel Audio Transcription](react_audio) template and learn more in [A New Audio Transcription UI for Speed and Quality at Scale](https://humansignal.com/blog/building-a-better-ui-for-audio-transcription-at-scale/) (blog post).
 
 ## Interactive Template Preview
 
@@ -28,7 +33,7 @@ If you want to perform audio classification tasks on specific segments of audio 
     <Label value="Other"></Label>
   </Labels>
   <Header value="Listen to the audio:"></Header>
-  <AudioPlus name="audio" value="$url"></AudioPlus>
+  <Audio name="audio" value="$url"></Audio>
 </View>
 ```
 
@@ -52,12 +57,12 @@ Use the [Labels](/tags/labels.html) control tag to allow annotators to segment t
 ```
 The `choice="multiple"` argument allows one audio segment to be labeled with multiple topics.
 
-Use the [AudioPlus](/tags/audioplus.html) object tag to specify the location of the audio file to classify:
+Use the [Audio](/tags/audio.html) object tag to specify the location of the audio file to classify:
 ```xml
-<AudioPlus name="audio" value="$url"></AudioPlus>
+<Audio name="audio" value="$url"></Audio>
 ```
 
 ## Related tags
 
-- [AudioPlus](/tags/audioplus.html)
+- [Audio](/tags/audio.html)
 - [Labels](/tags/labels.html)

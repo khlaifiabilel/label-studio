@@ -3,7 +3,7 @@ title: PDF Classification
 type: templates
 category: Structured Data Parsing
 cat: structured-data-parsing
-order: 602
+order: 510
 meta_title: PDF Classification Data Labeling Template
 meta_description: Template for classifying PDF data with Label Studio for your machine learning and data science projects.
 ---
@@ -26,8 +26,12 @@ If you want to perform PDF classification, use this template. This template prom
         <Choice value="Important article"/>
         <Choice value="Yellow press"/>
     </Choices>
-    <HyperText name="pdf" value="$pdf" inline="true"/>
+    <Pdf name="pdf" value="$pdf"/>
 </View>
+
+<!-- {
+    "pdf": "/static/samples/sample.pdf"
+} -->
 ```
 
 ## About the labeling configuration
@@ -52,16 +56,22 @@ Use the [Choices](/tags/choices.html) control tag to present classification opti
   </Choices>
 ```
 
-Use the [HyperText](/tags/hypertext.html) tag to render an inline version of the PDF data:
+Use the [Pdf](/tags/pdf.html) tag to render an inline version of the PDF data:
 ```xml
-<HyperText name="pdf" value="$pdf" inline="true"/>
+<Pdf name="pdf" value="$pdf"/>
 ```
 
 ### Input data
 
-Label Studio does not support labeling PDF-formatted files directly. Instead, convert your PDF to HTML or an image file. See [importing tasks](/guide/tasks.html) for more.  
+Label Studio does not support labeling PDF-formatted files directly. You should use the `embed` tag inside of your data for pdf loading:
+
+```
+{
+    "pdf": "<embed src='https://app.heartex.ai/static/samples/sample.pdf' width='100%' height='600px'/>"
+}
+```
 
 ## Related tags
 - [Rating](/tags/rating.html)
 - [Choices](/tags/choices.html)
-- [HyperText](/tags/hypertext.html)
+- [Pdf](/tags/pdf.html)

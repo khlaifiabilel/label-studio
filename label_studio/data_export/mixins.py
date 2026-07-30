@@ -1,35 +1,30 @@
-from datetime import datetime
-from functools import reduce
 import hashlib
-import io
 import json
 import logging
 import pathlib
 import shutil
+from datetime import datetime
+from functools import reduce
 
+from core.feature_flags import flag_set
+from core.redis import redis_connected, start_job_async_or_sync
+from core.utils.common import batch
+from core.utils.io import (
+    SerializableGenerator,
+    get_all_dirs_from_dir,
+    get_all_files_from_dir,
+    get_temp_dir,
+)
+from data_manager.models import View
+from django.conf import settings
 from django.core.files import File
 from django.core.files import temp as tempfile
 from django.db import transaction
 from django.db.models import Prefetch
 from django.db.models.query_utils import Q
 from django.utils import dateformat, timezone
-import django_rq
-from label_studio_converter import Converter
-from django.conf import settings
-
-from core.redis import redis_connected
-from core.utils.common import batch
-from core.utils.io import (
-    get_all_files_from_dir,
-    get_temp_dir,
-    read_bytes_stream,
-    get_all_dirs_from_dir,
-    SerializableGenerator,
-)
-from data_manager.models import View
-from projects.models import Project
-from tasks.models import Annotation, Task
-
+from label_studio_sdk.converter import Converter
+from tasks.models import Annotation, AnnotationDraft, Task
 
 ONLY = 'only'
 EXCLUDE = 'exclude'
@@ -40,10 +35,11 @@ logger = logging.getLogger(__name__)
 
 class ExportMixin:
     def has_permission(self, user):
+        user.project = self.project  # link for activity log
         return self.project.has_permission(user)
 
     def get_default_title(self):
-        return f"{self.project.title.replace(' ', '-')}-at-{dateformat.format(timezone.now(), 'Y-m-d-H-i')}"
+        return f'{self.project.title.replace(" ", "-")}-at-{dateformat.format(timezone.now(), "Y-m-d-H-i")}'
 
     def _get_filtered_tasks(self, tasks, task_filter_options=None):
         """
@@ -75,9 +71,9 @@ class ExportMixin:
         if 'finished' in task_filter_options:
             value = task_filter_options['finished']
             if value == ONLY:
-                tasks = tasks.filter(is_labled=True)
+                tasks = tasks.filter(is_labeled=True)
             elif value == EXCLUDE:
-                tasks = tasks.exclude(is_labled=True)
+                tasks = tasks.exclude(is_labeled=True)
         if 'annotated' in task_filter_options:
             value = task_filter_options['annotated']
             # if any annotation exists and is not cancelled
@@ -99,23 +95,32 @@ class ExportMixin:
         })
         """
         queryset = Annotation.objects.all()
-        if not isinstance(annotation_filter_options, dict):
-            return queryset
+        if isinstance(annotation_filter_options, dict):
+            q_list = []
+            if annotation_filter_options.get('usual'):
+                q_list.append(Q(was_cancelled=False, ground_truth=False))
+            if annotation_filter_options.get('ground_truth'):
+                q_list.append(Q(ground_truth=True))
+            if annotation_filter_options.get('skipped'):
+                q_list.append(Q(was_cancelled=True))
+            if q_list:
+                q = reduce(lambda x, y: x | y, q_list)
+                queryset = queryset.filter(q)
 
-        q_list = []
-        if annotation_filter_options.get('usual'):
-            q_list.append(Q(was_cancelled=False, ground_truth=False))
-        if annotation_filter_options.get('ground_truth'):
-            q_list.append(Q(ground_truth=True))
-        if annotation_filter_options.get('skipped'):
-            q_list.append(Q(was_cancelled=True))
-        if not q_list:
-            return queryset
+        # pre-select completed_by user info
+        queryset = queryset.select_related('completed_by')
+        # prefetch reviews in LSE
+        if hasattr(queryset.model, 'reviews'):
+            from reviews.models import AnnotationReview
 
-        q = reduce(lambda x, y: x | y, q_list)
-        return queryset.filter(q)
+            queryset = queryset.prefetch_related(
+                Prefetch('reviews', queryset=AnnotationReview.objects.select_related('created_by'))
+            )
 
-    def _get_export_serializer_option(self, serialization_options):
+        return queryset
+
+    @staticmethod
+    def _get_export_serializer_option(serialization_options):
         options = {'expand': []}
         if isinstance(serialization_options, dict):
             if (
@@ -137,20 +142,47 @@ class ExportMixin:
             options['context'] = {'interpolate_key_frames': settings.INTERPOLATE_KEY_FRAMES}
             if 'interpolate_key_frames' in serialization_options:
                 options['context']['interpolate_key_frames'] = serialization_options['interpolate_key_frames']
+            if serialization_options.get('include_annotation_history') is False:
+                options['omit'] = ['annotations.history']
+            # download resources
+            if serialization_options.get('download_resources') is True:
+                options['download_resources'] = True
         return options
 
     def get_task_queryset(self, ids, annotation_filter_options):
-        annotations_qs = self._get_filtered_annotations_queryset(
-            annotation_filter_options=annotation_filter_options
+        from core.feature_flags import flag_set
+
+        annotations_qs = self._get_filtered_annotations_queryset(annotation_filter_options=annotation_filter_options)
+
+        # Only annotate FSM state if both feature flags are enabled
+        # This prevents unnecessary query annotations when state won't be serialized
+        user = getattr(self, 'created_by', None)
+        if (
+            flag_set('fflag_feat_fit_568_finite_state_management', user=user)
+            and flag_set('fflag_feat_fit_710_fsm_state_fields', user=user)
+            and hasattr(annotations_qs, 'with_state')
+        ):
+            annotations_qs = annotations_qs.with_state()
+
+        qs = (
+            Task.objects.filter(id__in=ids)
+            .select_related('file_upload')  # select_related more efficient for regular foreign-key relationship
+            .prefetch_related(
+                Prefetch('annotations', queryset=annotations_qs),
+                Prefetch('drafts', queryset=AnnotationDraft.objects.select_related('user')),
+                'comment_authors',
+            )
         )
-        return Task.objects.filter(id__in=ids).prefetch_related(
-            Prefetch(
-                "annotations",
-                queryset=annotations_qs,
-            )
-        ).select_related('project').prefetch_related(
-                'predictions', 'drafts'
-            )
+
+        # Add FSM state annotation to tasks as well to avoid N+1 queries during export
+        if (
+            flag_set('fflag_feat_fit_568_finite_state_management', user=user)
+            and flag_set('fflag_feat_fit_710_fsm_state_fields', user=user)
+            and hasattr(qs, 'with_state')
+        ):
+            qs = qs.with_state()
+
+        return qs
 
     def get_export_data(self, task_filter_options=None, annotation_filter_options=None, serialization_options=None):
         """
@@ -179,36 +211,55 @@ class ExportMixin:
 
         logger.debug('Run get_task_queryset')
 
+        start = datetime.now()
         with transaction.atomic():
             # TODO: make counters from queryset
             # counters = Project.objects.with_counts().filter(id=self.project.id)[0].get_counters()
             self.counters = {'task_number': 0}
-            result = []
             all_tasks = self.project.tasks
             logger.debug('Tasks filtration')
-            task_ids = (
+            task_ids = list(
                 self._get_filtered_tasks(all_tasks, task_filter_options=task_filter_options)
                 .distinct()
                 .values_list('id', flat=True)
             )
             base_export_serializer_option = self._get_export_serializer_option(serialization_options)
             i = 0
-            BATCH_SIZE = 1000
+
+            if flag_set('fflag_fix_back_plt_807_batch_size_26062025_short', self.project.organization.created_by):
+                BATCH_SIZE = self.project.get_task_batch_size()
+            else:
+                BATCH_SIZE = settings.BATCH_SIZE
+
             for ids in batch(task_ids, BATCH_SIZE):
                 i += 1
                 tasks = list(self.get_task_queryset(ids, annotation_filter_options))
-                logger.debug(f'Batch: {i*BATCH_SIZE}')
+                logger.debug(f'Batch: {i * BATCH_SIZE}')
                 if isinstance(task_filter_options, dict) and task_filter_options.get('only_with_annotations'):
                     tasks = [task for task in tasks if task.annotations.exists()]
+
+                if serialization_options and serialization_options.get('include_annotation_history') is True:
+                    task_ids = [task.id for task in tasks]
+                    annotation_ids = Annotation.objects.filter(task_id__in=task_ids).values_list('id', flat=True)
+                    base_export_serializer_option = self.update_export_serializer_option(
+                        base_export_serializer_option, annotation_ids
+                    )
 
                 serializer = ExportDataSerializer(tasks, many=True, **base_export_serializer_option)
                 self.counters['task_number'] += len(tasks)
                 for task in serializer.data:
                     yield task
+        duration = datetime.now() - start
+        logger.info(
+            f'{self.counters["task_number"]} tasks from project {self.project_id} exported in {duration.total_seconds():.2f} seconds'
+        )
+
+    def update_export_serializer_option(self, base_export_serializer_option, annotation_ids):
+        return base_export_serializer_option
 
     @staticmethod
     def eval_md5(file):
-        md5_object = hashlib.md5()
+        md5_object = hashlib.md5()  # nosec
         block_size = 128 * md5_object.block_size
         chunk = file.read(block_size)
         while chunk:
@@ -220,9 +271,7 @@ class ExportMixin:
     def save_file(self, file, md5):
         now = datetime.now()
         file_name = f'project-{self.project.id}-at-{now.strftime("%Y-%m-%d-%H-%M")}-{md5[0:8]}.json'
-        file_path = (
-            f'{self.project.id}/{file_name}'
-        )  # finally file will be in settings.DELAYED_EXPORT_DIR/self.project.id/file_name
+        file_path = f'{self.project.id}/{file_name}'  # finally file will be in settings.DELAYED_EXPORT_DIR/self.project.id/file_name
         file_ = File(file, name=file_path)
         self.file.save(file_path, file_)
         self.md5 = md5
@@ -245,7 +294,7 @@ class ExportMixin:
                     )
                 )
             )
-            with tempfile.NamedTemporaryFile(suffix=".export.json", dir=settings.FILE_UPLOAD_TEMP_DIR) as file:
+            with tempfile.NamedTemporaryFile(suffix='.export.json', dir=settings.FILE_UPLOAD_TEMP_DIR) as file:
                 for chunk in iter_json:
                     encoded_chunk = chunk.encode('utf-8')
                     file.write(encoded_chunk)
@@ -257,10 +306,10 @@ class ExportMixin:
             self.status = self.Status.COMPLETED
             self.save(update_fields=['status'])
 
-        except Exception as exc:
+        except Exception as e:
             self.status = self.Status.FAILED
             self.save(update_fields=['status'])
-            logger.exception('Export was failed')
+            logger.exception('Export was failed: %s', e)
         finally:
             self.finished_at = datetime.now()
             self.save(update_fields=['finished_at'])
@@ -274,13 +323,13 @@ class ExportMixin:
         self.save(update_fields=['status'])
 
         if redis_connected():
-            queue = django_rq.get_queue('default')
-            job = queue.enqueue(
+            start_job_async_or_sync(
                 export_background,
                 self.id,
                 task_filter_options,
                 annotation_filter_options,
                 serialization_options,
+                queue_name='default',
                 on_failure=set_export_background_failure,
                 job_timeout='3h',  # 3 hours
             )
@@ -291,7 +340,15 @@ class ExportMixin:
                 serialization_options=serialization_options,
             )
 
-    def convert_file(self, to_format):
+    def convert_file(self, to_format, download_resources=False, hostname=None):
+        logger.info(
+            ('Starting export conversion: export_id=%s project_id=%s to_format=%s download_resources=%s hostname=%s'),
+            self.id,
+            self.project_id,
+            to_format,
+            download_resources,
+            hostname,
+        )
         with get_temp_dir() as tmp_dir:
             OUT = 'out'
             out_dir = pathlib.Path(tmp_dir) / OUT
@@ -301,34 +358,85 @@ class ExportMixin:
                 config=self.project.get_parsed_config(),
                 project_dir=None,
                 upload_dir=out_dir,
-                download_resources=False,
+                download_resources=download_resources,
+                # for downloading resource we need access to the API
+                access_token=self.project.organization.created_by.auth_token.key,
+                hostname=hostname,
             )
             input_name = pathlib.Path(self.file.name).name
             input_file_path = pathlib.Path(tmp_dir) / input_name
 
-            with open(input_file_path, 'wb') as file_:
-                file_.write(self.file.open().read())
+            logger.info(
+                'Staging export input for conversion: export_id=%s input_name=%s input_path=%s',
+                self.id,
+                input_name,
+                input_file_path,
+            )
+            with self.file.open() as file_in, open(input_file_path, 'wb') as file_out:
+                shutil.copyfileobj(file_in, file_out)
+            logger.info(
+                'Input staged for conversion: export_id=%s input_size_bytes=%s',
+                self.id,
+                input_file_path.stat().st_size,
+            )
 
+            logger.info(
+                'Running converter: export_id=%s to_format=%s output_dir=%s',
+                self.id,
+                to_format,
+                out_dir,
+            )
             converter.convert(input_file_path, out_dir, to_format, is_dir=False)
+            logger.info('Converter finished: export_id=%s to_format=%s', self.id, to_format)
 
             files = get_all_files_from_dir(out_dir)
             dirs = get_all_dirs_from_dir(out_dir)
+            logger.info(
+                'Conversion output discovered: export_id=%s files=%s dirs=%s',
+                self.id,
+                len(files),
+                len(dirs),
+            )
 
             if len(files) == 0 and len(dirs) == 0:
+                logger.info('Conversion has no output: export_id=%s to_format=%s', self.id, to_format)
                 return None
             elif len(files) == 1 and len(dirs) == 0:
                 output_file = files[0]
                 filename = pathlib.Path(input_name).stem + pathlib.Path(output_file).suffix
+                output_kind = 'single_file'
             else:
                 shutil.make_archive(out_dir, 'zip', out_dir)
                 output_file = pathlib.Path(tmp_dir) / (str(out_dir.stem) + '.zip')
                 filename = pathlib.Path(input_name).stem + '.zip'
+                output_kind = 'zip_archive'
 
-            out = read_bytes_stream(output_file)
-            return File(
-                out,
-                name=filename,
+            logger.info(
+                (
+                    'Streaming conversion output to temporary file: export_id=%s output_kind=%s '
+                    'output_file=%s output_size_bytes=%s final_name=%s'
+                ),
+                self.id,
+                output_kind,
+                output_file,
+                pathlib.Path(output_file).stat().st_size,
+                filename,
             )
+            result_file = tempfile.NamedTemporaryFile(
+                suffix=pathlib.Path(filename).suffix,
+                dir=settings.FILE_UPLOAD_TEMP_DIR,
+            )
+            with open(output_file, mode='rb') as f:
+                shutil.copyfileobj(f, result_file)
+            result_size = result_file.tell()
+            result_file.seek(0)
+            logger.info(
+                'Conversion file ready: export_id=%s filename=%s size_bytes=%s',
+                self.id,
+                filename,
+                result_size,
+            )
+            return File(result_file, name=filename)
 
 
 def export_background(

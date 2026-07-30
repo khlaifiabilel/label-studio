@@ -1,20 +1,25 @@
 ---
 title: Start Label Studio
 type: guide
-order: 206
-meta_title: Start Commands for Label Studio
+tier: opensource
+order: 93
+order_enterprise: 0
+meta_title: Start commands for Label Studio
 meta_description: Documentation for starting Label Studio and configuring the environment to use Label Studio with your machine learning or data science project. 
+section: "Install & Setup"
 ---
 
 After you install Label Studio, start the server to start using it. 
 
 ```bash
 label-studio start
-```
+``` 
 
-By default, Label Studio starts with a SQLite database to store labeling tasks and annotations. You can specify different source and target storage for labeling tasks and annotations using Label Studio UI or the API. See [Database storage](storedata.html) for more.
+By default, Label Studio starts with an SQLite database to store labeling tasks and annotations. You can specify different sources and target storage for labeling tasks and annotations using Label Studio UI or the API. See [Database storage](storedata.html) for more.
+
 
 ## Command line arguments for starting Label Studio
+
 You can specify a machine learning backend and other options using the command line interface. Run `label-studio --help` to see all available options, or refer to the following tables.
 
 Some available commands for Label Studio provide information or start the Label Studio server:
@@ -50,8 +55,9 @@ The following command line arguments are optional and must be specified with `la
 | `--initial-project-description` | `LABEL_STUDIO_PROJECT_DESC` | `''` | Specify a project description for a Label Studio project. See [Set up your labeling project](setup.html). |
 | `--password` | `LABEL_STUDIO_PASSWORD` | `None` | Password to use for the default user. See [Set up user accounts](signup.html). |
 | `--username` | `LABEL_STUDIO_USERNAME` | `default_user@localhost` | Username to use for the default user. See [Set up user accounts](signup.html). |
-| `--user-token` |  `LABEL_STUDIO_USER_TOKEN` | Automatically generated. | Authentication token for a user to use for the API. Must be set with a username, otherwise automatically generated. See [Set up user accounts](signup.html).
+| `--user-token` |  `LABEL_STUDIO_USER_TOKEN` | Automatically generated. | Authentication token for a user to use for the API. Must be set with a username, otherwise automatically generated. See [Set up user accounts](signup.html). |
 | `--agree-fix-sqlite` | N/A | `False` | Automatically agree to let Label Studio fix SQLite issues when using Python 3.6–3.8 on Windows operating systems. | 
+| `--enable-legacy-api-token` | `LABEL_STUDIO_ENABLE_LEGACY_API_TOKEN` | `False` | Enable legacy API token authentication. Useful for running with a pre-existing token via `--user-token`. |
 | N/A | `LABEL_STUDIO_LOCAL_FILES_SERVING_ENABLED` | `False` | Allow Label Studio to access local file directories to import storage. See [Run Label Studio on Docker and use local storage](start.html#Run_Label_Studio_on_Docker_and_use_local_storage). |
 | N/A | `LABEL_STUDIO_LOCAL_FILES_DOCUMENT_ROOT` | `/` | Specify the root directory for Label Studio to use when accessing local file directories. See [Run Label Studio on Docker and use local storage](start.html#Run_Label_Studio_on_Docker_and_use_local_storage). |
 
@@ -62,8 +68,12 @@ In *nix operating systems, you can set environment variables from the command li
 ```bash
 export LABEL_STUDIO_LOCAL_FILES_SERVING_ENABLED=true
 ```
-You can also use an `.env` file. 
 
+!!! note
+    If you are using Docker, you can write all your [environment variables into the `.env`](https://docs.docker.com/compose/env-file/) file.
+    
+    
+    
 On Windows, you can use the following syntax:
 ```bash
 set LABEL_STUDIO_LOCAL_FILES_SERVING_ENABLED=true
@@ -80,6 +90,7 @@ echo %LABEL_STUDIO_LOCAL_FILES_SERVING_ENABLED%
 ```
 
 ## Run Label Studio on localhost with a different port
+
 By default, Label Studio runs on port 8080. If that port is already in use or if you want to specify a different port, start Label Studio with the following command:
 ```bash
 label-studio start --port <port>
@@ -99,10 +110,13 @@ LABEL_STUDIO_PORT = 9001
 
 To run Label Studio on Docker with a port other than the default of 8080, use the port argument when starting Label Studio on Docker. For example, to start Label Studio in a Docker container accessible with port 9001, run the following: 
 ```bash
-docker run -it -p 9001:8080 -v `pwd`/mydata:/label-studio/data heartexlabs/label-studio:latest label-studio
+docker run -it -p 9001:8080 -v $(pwd)/mydata:/label-studio/data heartexlabs/label-studio:latest label-studio
 ```
 
-Or, if you're using Docker Compose, update the `docker-compose.yml` file that you're using to expose a different port for the NGINX server used to proxy the connection to Label Studio. For example, this portion of the [`docker-compose.yml`](https://github.com/heartexlabs/label-studio/blob/master/docker-compose.yml) file exposes port 9001 instead of port 80 for proxying Label Studio:
+!!! attention "important"
+    As this is a non-root container, the mounted files and directories must have the proper permissions for the `UID 1001`.
+
+Or, if you're using Docker Compose, update the `docker-compose.yml` file that you're using to expose a different port for the NGINX server used to proxy the connection to Label Studio. For example, this portion of the [`docker-compose.yml`](https://github.com/HumanSignal/label-studio/blob/develop/docker-compose.yml) file exposes port 9001 instead of port 80 for proxying Label Studio:
 ```
 ...
 nginx:
@@ -121,17 +135,102 @@ To run Label Studio on Docker with a host and sub-path, just pass `LABEL_STUDIO_
 LABEL_STUDIO_HOST=http://localhost:8080/foo docker-compose up -d
 ```
 
-## Run Label Studio on Docker and use local storage
+## Expose a local Label Studio instance outside using ngrok
+
+Sometimes it's useful to have the LabelStudio instance you're running on your local machine to be reachable over the internet. For example, if you want to share your Label Studio instance with a team member or a client.
+
+One way to do that is to use [ngrok](https://ngrok.io/), a reverse proxy that allows you to expose your instance to the Internet.
+
+1. If you have Label Studio running, stop it (`Ctrl+C`).
+2. Sign up for a free ngrok account at [ngrok.com](https://dashboard.ngrok.com/signup).
+3. When you log in to your ngrok account, you will open [a dashboard with instructions](https://dashboard.ngrok.com/get-started/setup) to install ngrok and authenticate it. Complete both these steps:
+
+    ![Ngrok authentication](images/install/ngrok-dashboard.png)  
+
+4. Start ngrok and point it at Label Studio: 
+
+    ```bash
+    ngrok http --host-header=rewrite 8080
+    ```
+5. This will output a randomly generated URL. Copy this URL:
+
+    ![Ngrok URL](images/install/ngrok-url.png)
+
+5. Run the following commands (replace `your-subdomain.ngrok-free.app` with your actual ngrok URL as copied in step 5):
+
+
+   
+<div class="code-tabs">
+<div data-name="Native - Mac/Unix">
+
+```bash
+# Avoid CSRF errors 
+# Must exactly match the ngrok HTTPS URL, with no trailing slash
+export CSRF_TRUSTED_ORIGINS=https://your-subdomain.ngrok-free.app
+# Start Label Studio
+LABEL_STUDIO_HOST=https://your-subdomain.ngrok-free.app label-studio start
+```
+</div>
+
+<div data-name="Native - Windows">
+
+```bash
+# Avoid CSRF errors 
+# Must exactly match the ngrok HTTPS URL, with no trailing slash
+set CSRF_TRUSTED_ORIGINS=https://your-subdomain.ngrok-free.app
+# Start Label Studio
+LABEL_STUDIO_HOST=https://your-subdomain.ngrok-free.app label-studio start
+```
+</div>
+
+<div data-name="Docker Container">
+
+```bash
+# Avoid CSRF errors 
+# Must exactly match the ngrok HTTPS URL, with no trailing slash
+docker run -it -p 8080:8080 \
+-e CSRF_TRUSTED_ORIGINS=https://your-subdomain.ngrok-free.app \ 
+-e LABEL_STUDIO_HOST=https://your-subdomain.ngrok-free.app \
+-v <yourvolume>:/label-studio/data \
+heartexlabs/label-studio:latest
+```
+<div class="admonition attention"><p class="admonition-title">important</p>
+<p>As this is a non-root container, the mounted files and directories must have the proper permissions for the <code>UID 1001</code>.</p>
+</div>
+
+</div>
+
+<div data-name="Docker Compose">
+
+```bash
+# Avoid CSRF errors 
+# Must exactly match the ngrok HTTPS URL, with no trailing slash
+CSRF_TRUSTED_ORIGINS=https://your-subdomain.ngrok-free.app \
+LABEL_STUDIO_HOST=https://your-subdomain.ngrok-free.app docker compose up -d
+```
+</div>
+</div>
+
+
+
+Now you can open the ngrok URL in browser to make sure you see your Label Studio instance. 
+
+
+## Run Label Studio on Docker and use Local Storage
+
 To run Label Studio on Docker and reference persistent local storage directories, mount those directories as volumes when you start Label Studio and specify any environment variables you need.
 
 The following command starts a Docker container with the latest image of Label Studio with port 8080 and an environment variable that allows Label Studio to access local files. In this example, a local directory `./myfiles` is mounted to the `/label-studio/files` location. 
 ```bash
-docker run -it -p 8080:8080 -v `pwd`/mydata:/label-studio/data \
+docker run -it -p 8080:8080 -v $(pwd)/mydata:/label-studio/data \
 --env LABEL_STUDIO_LOCAL_FILES_SERVING_ENABLED=true \ 
 --env LABEL_STUDIO_LOCAL_FILES_DOCUMENT_ROOT=/label-studio/files \ 
--v `pwd`/myfiles:/label-studio/files \
+-v $(pwd)/myfiles:/label-studio/files \
 heartexlabs/label-studio:latest label-studio
 ```
+
+!!! attention "important"
+    As this is a non-root container, the mounted files and directories must have the proper permissions for the `UID 1001`.
 
 By specifying the environment variable `LABEL_STUDIO_LOCAL_FILES_DOCUMENT_ROOT=/label-studio/files`, Label Studio only scans this directory for local files. It's highly recommended to explicitly specify a `LABEL_STUDIO_LOCAL_FILES_DOCUMENT_ROOT` path to secure the volume access from the Docker container to your local machine.
 
@@ -139,9 +238,10 @@ Place files in the specified source directory (`./myfiles` in this example) and 
 
 If you're using Docker Compose, specify the volumes in the Docker Compose YAML file and add the relevant environment variables to the app container. For more about specifying volumes in Docker Compose, see the volumes section of the [Docker Compose file documentation](https://docs.docker.com/compose/compose-file/compose-file-v3/#volumes).
 
-## Run Label Studio with HTTPS
-To run Label Studio with HTTPS and access the web server using HTTPS in the browser, use NGINX or another web server to run HTTPS for Label Studio.  
 
+## Run Label Studio with HTTPS
+
+To run Label Studio with HTTPS and access the web server using HTTPS in the browser, use NGINX or another web server to run HTTPS for Label Studio.  
 
 
 ## Run Label Studio on the cloud using Heroku
@@ -162,7 +262,7 @@ Then you can specify the required environment variables for a PostgreSQL connect
 Our Heroku manifest uses [postgresql addon](https://elements.heroku.com/addons/heroku-postgresql) out of the box.
 Please notice that the storage capacity is limited.
 
-[<img src="https://www.herokucdn.com/deploy/button.svg" height="30px">](https://heroku.com/deploy?template=https://github.com/heartexlabs/label-studio/tree/master)
+[<img src="https://www.herokucdn.com/deploy/button.svg" height="30px">](https://heroku.com/deploy?template=https://github.com/HumanSignal/label-studio/tree/master)
 
 Please notice that all uploaded data via import will be lost after a dyno replace since [filesystem is ephemeral](https://devcenter.heroku.com/articles/dynos#ephemeral-filesystem).
 Using S3 storage is recommended.
@@ -171,6 +271,8 @@ Using S3 storage is recommended.
 ## Run Label Studio on the cloud using a different cloud provider
 To run Label Studio on the cloud using a cloud provider such as Google Cloud Services (GCS), Amazon Web Services (AWS), or Microsoft Azure, 
 -->
+
+
 ## Run Label Studio with an external domain name
 
 If you want multiple people to collaborate on a project, you might want to run Label Studio with an external domain name. 
@@ -191,6 +293,7 @@ LABEL_STUDIO_HOST = https://subdomain.example.com:7777
 You must specify the protocol for the domain name: `http://` or `https://`
 
 If your external host has a port, specify the port as part of the host name. 
+
 
 ## Set up task sampling for your project 
 

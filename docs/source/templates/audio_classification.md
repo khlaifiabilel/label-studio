@@ -3,7 +3,7 @@ title: Audio Classification
 type: templates
 category: Audio/Speech Processing
 cat: audio-speech-processing
-order: 307
+order: 330
 meta_title: Audio Classification Data Labeling Template
 meta_description: Template for classifying audio and intent using Label Studio for your data science and machine learning projects.
 ---
@@ -11,6 +11,11 @@ meta_description: Template for classifying audio and intent using Label Studio f
 <img src="/images/templates-misc/audio-classification.png" alt="" class="gif-border" width="482px" height="282px" />
 
 If you want to perform audio classification tasks, such as intent or sentiment classification, you can use this template to listen to an audio file and classify the topic of the clip.
+
+!!! error Enterprise
+    If you're managing more complex or high-volume audio labeling projects, Label Studio Enterprise includes an advanced audio transcription interface built to support faster, more precise annotation at scale.
+
+    See our new [Multi-Channel Audio Transcription](react_audio) template and learn more in [A New Audio Transcription UI for Speed and Quality at Scale](https://humansignal.com/blog/building-a-better-ui-for-audio-transcription-at-scale/) (blog post).
 
 ## Interactive Template Preview
 
@@ -58,6 +63,28 @@ You must use the Choices tag in combination with the [Choice](/tags/choice.html)
     <Choice value="Other"></Choice>
 </Choices>
 ```
+
+## Enhance this template
+This template can be enhanced in many ways.
+
+### Change the appearance of choices
+
+If you want to make the classification section visually distinct from the rest of the labeling interface, you can add styling to the [View](/tags/view.html) tag. Wrap the [Choices](/tags/choices.html) and [Header](/tags/header.html) in their own View tag:
+```xml
+<View style="box-shadow: 2px 2px 5px #999;
+             padding: 20px; margin-top: 2em;
+             border-radius: 5px;">
+  <Header value="Select the topic of the audio clip"/>
+  <Choices name="label" toName="audio" choice="single-radio" showInline="true">
+    <Choice value="Politics"></Choice>
+    <Choice value="Business"></Choice>
+    <Choice value="Education"></Choice>
+    <Choice value="Other"></Choice>
+  </Choices>
+</View>
+```
+
+{% insertmd includes/nested-classification.md %}
 
 ## Related tags
 

@@ -5,7 +5,6 @@ marks:
   - usefixtures:
       - django_live_url
   - skipif: "'default' not in '{tavern.env_vars.DJANGO_DB}'"
-
 stages:
 
   - id: signup
@@ -17,6 +16,7 @@ stages:
       data:
         title: Test Draft 1
         show_collab_predictions: true
+        label_config: '<View><Text name="text" value="$text"/><Choices name="text_class" toName="text"><Choice value="class_A"/><Choice value="class_B"/><Choice value="class_TESTING"/><Choice value="class_PREDICTIONS_TESTING"/></Choices></View>'
       method: POST
       url: '{django_live_url}/api/projects'
     response:
@@ -103,7 +103,7 @@ stages:
         "tasks": [
         {
           "cancelled_annotations": 0,
-
+          "storage_filename": null,
           "annotations_results": "",
           "data": {
             "text": "opop",
@@ -145,7 +145,7 @@ stages:
         },
         {
           "cancelled_annotations": 0,
-
+          "storage_filename": null,
           "annotations_results": !raw "[{type:choices, value:{choices:[class_A]}, to_name:text, from_name:text_class}]",
           "data": {
             "text": "Test example phrase 1",
@@ -210,7 +210,7 @@ stages:
         },
         {
           "cancelled_annotations": 0,
-
+          "storage_filename": null,
           "annotations_results": !anystr "",
           "data": {
             "text": "x2",
@@ -292,7 +292,7 @@ stages:
         },
         {
           "cancelled_annotations": 0,
-
+          "storage_filename": null,
 
           "annotations_results": !raw "[{type:choices, value:{choices:[class_TESTING]}, to_name:text, from_name:text_class}]",
           "data": {
@@ -338,7 +338,6 @@ stages:
         ]
       }
 
-
 ---
 test_name: tasks-all-fields-sqlite
 strict: false
@@ -357,6 +356,7 @@ stages:
       data:
         title: Test Draft 1
         show_collab_predictions: true
+        label_config: '<View><Text name="text" value="$text"/><Choices name="text_class" toName="text"><Choice value="class_A"/><Choice value="class_B"/><Choice value="class_TESTING"/><Choice value="class_PREDICTIONS_TESTING"/></Choices></View>'
       method: POST
       url: '{django_live_url}/api/projects'
     response:
@@ -444,6 +444,7 @@ stages:
           "tasks": [
           {
             "cancelled_annotations": 0,
+            "storage_filename": null,
             "annotations_results": !raw "[{from_name: text_class, to_name: text, type: choices, value: {choices: [class_A]}}]",
             "data": {
               "text": "Test example phrase 1",
@@ -512,6 +513,7 @@ stages:
           },
           {
             "cancelled_annotations": 0,
+            "storage_filename": null,
             "annotations_results": "",
             "data": {
               "int_field": 42,
@@ -554,6 +556,7 @@ stages:
           },
           {
             "cancelled_annotations": 0,
+            "storage_filename": null,
             "annotations_results": !anystr "",
             "data": {
               "int_field": 20,
@@ -645,6 +648,7 @@ stages:
           },
           {
             "cancelled_annotations": 0,
+            "storage_filename": null,
             "annotations_results": !raw "[{from_name: text_class, to_name: text, type: choices, value: {choices: [class_TESTING]}}]",
             "data": {
               "int_field": "99",
@@ -707,6 +711,7 @@ stages:
       data:
         title: Test Draft 1
         show_collab_predictions: true
+        label_config: '<View><Text name="text" value="$text"/><Choices name="text_class" toName="text"><Choice value="class_A"/><Choice value="class_B"/><Choice value="class_TESTING"/><Choice value="class_PREDICTIONS_TESTING"/></Choices></View>'
       method: POST
       url: '{django_live_url}/api/projects'
     response:
@@ -775,7 +780,7 @@ stages:
         "tasks": [
         {
           "cancelled_annotations": 0,
-
+          "storage_filename": null,
 
           "annotations_results": "",
           "data": {
@@ -821,7 +826,7 @@ stages:
         },
         {
           "cancelled_annotations": 0,
-
+          "storage_filename": null,
 
           "annotations_results": "",
           "data": {
@@ -842,7 +847,7 @@ stages:
         },
         {
           "cancelled_annotations": 0,
-
+          "storage_filename": null,
 
           "annotations_results": "",
           "data": {
@@ -863,7 +868,6 @@ stages:
         }
         ]
       }
-
 
   - name: setup_views
     request:
@@ -909,7 +913,7 @@ stages:
         "tasks": [
         {
           "cancelled_annotations": 0,
-
+          "storage_filename": null,
 
           "data": {
             "text": "Test example phrase 1",
@@ -980,7 +984,7 @@ stages:
         },
         {
           "cancelled_annotations": 0,
-
+          "storage_filename": null,
 
           "data": {
             "int_field": 20,
@@ -1072,7 +1076,7 @@ stages:
         },
         {
           "cancelled_annotations": 0,
-
+          "storage_filename": null,
 
           "data": {
             "int_field": "99",
@@ -1120,12 +1124,6 @@ stages:
         ]
       }
 
-
-
-
-
-
-
 ---
 test_name: tasks-minimal-fields
 strict: false
@@ -1143,6 +1141,7 @@ stages:
       data:
         title: Test Draft 1
         show_collab_predictions: true
+        label_config: '<View><Text name="text" value="$text"/><Choices name="text_class" toName="text"><Choice value="class_A"/><Choice value="class_B"/><Choice value="class_TESTING"/><Choice value="class_PREDICTIONS_TESTING"/></Choices></View>'
       method: POST
       url: '{django_live_url}/api/projects'
     response:
@@ -1328,3 +1327,633 @@ stages:
         "total_predictions": 0,
         "total": 0,
       }
+
+  - name: get_first_task
+    request:
+      method: GET
+      url: '{django_live_url}/api/projects/{project_pk}/next'
+    response:
+      save:
+        json:
+          first_task_id: id
+      status_code: 200
+
+  - name: create_annotation_first_task
+    request:
+      headers:
+        content-type: application/json
+      json:
+        lead_time: 5
+        result:
+        - from_name: label
+          to_name: text
+          type: choices
+          value:
+            choices:
+            - class_B
+      method: POST
+      url: '{django_live_url}/api/tasks/{first_task_id}/annotations'
+    response:
+      save:
+        json:
+          annotation_pk: id
+      status_code: 201
+
+  - name: setup_views
+    request:
+      method: POST
+      url: '{django_live_url}/api/dm/views/?project={project_pk}'
+      json: {
+        "data": {
+          "filters": {
+            "conjunction": "or",
+            "items": [
+              {
+                "filter": "filter:tasks:updated_by",
+                "operator": "contains",
+                "type": "List",
+                "value": !int "{created_by}",
+              }
+            ]
+          },
+          "ordering": [
+            "tasks:data.text"
+          ]
+        },
+        "project": !int "{project_pk}"
+      }
+    response:
+      save:
+        json:
+          view: "@"
+      status_code: 201
+
+  - name: get_tasks
+    request:
+      method: GET
+      url: '{django_live_url}/api/tasks?view={view.id}'
+    response:
+      status_code: 200
+      verify_response_with:
+        function: label_studio.tests.utils:save_response
+      json: {
+        "total_annotations": 1,
+        "total_predictions": 0,
+        "total": 1,
+      }
+
+  - name: setup_views
+    request:
+      method: POST
+      url: '{django_live_url}/api/dm/views/?project={project_pk}'
+      json: {
+        "data": {
+          "filters": {
+            "conjunction": "or",
+            "items": [
+              {
+                "filter": "filter:tasks:updated_by",
+                "operator": "not_contains",
+                "type": "List",
+                "value": !int "{created_by}",
+              }
+            ]
+          },
+          "ordering": [
+            "tasks:data.text"
+          ]
+        },
+        "project": !int "{project_pk}"
+      }
+    response:
+      save:
+        json:
+          view: "@"
+      status_code: 201
+
+  - name: get_tasks
+    request:
+      method: GET
+      url: '{django_live_url}/api/tasks?view={view.id}'
+    response:
+      status_code: 200
+      verify_response_with:
+        function: label_studio.tests.utils:save_response
+      json: {
+        "total_annotations": 4,
+        "total_predictions": 3,
+        "total": 5,
+      }
+
+  - name: setup_views
+    request:
+      method: POST
+      url: '{django_live_url}/api/dm/views/?project={project_pk}'
+      json: {
+        "data": {
+          "filters": {
+            "conjunction": "or",
+            "items": [
+              {
+                "filter": "filter:tasks:updated_by",
+                "operator": "equal",
+                "type": "List",
+                "value": !int "{created_by}",
+              }
+            ]
+          },
+          "ordering": [
+            "tasks:data.text"
+          ]
+        },
+        "project": !int "{project_pk}"
+      }
+    response:
+      save:
+        json:
+          view: "@"
+      status_code: 201
+
+  - name: get_tasks
+    request:
+      method: GET
+      url: '{django_live_url}/api/tasks?view={view.id}'
+    response:
+      status_code: 200
+      verify_response_with:
+        function: label_studio.tests.utils:save_response
+      json: {
+        "total_annotations": 1,
+        "total_predictions": 0,
+        "total": 1,
+      }
+
+---
+
+test_name: tasks-storage-filename-s3
+strict: false
+marks:
+  - usefixtures:
+      - django_live_url
+stages:
+
+  - id: signup
+    type: ref
+
+  - id: create_project
+    name: create_project
+    request:
+      data:
+        title: Test Draft 1
+        show_collab_predictions: true
+        label_config: '<View><Text name="text" value="$text"/><Choices name="text_class" toName="text"><Choice value="class_A"/><Choice value="class_B"/><Choice value="class_TESTING"/><Choice value="class_PREDICTIONS_TESTING"/></Choices></View>'
+      method: POST
+      url: '{django_live_url}/api/projects'
+    response:
+      save:
+        json:
+          project_pk: id
+          created_by: created_by.id
+      status_code: 201
+
+  - name: Add S3 storage
+    request:
+      data:
+        bucket: pytest-s3-images
+        project: '{project_pk}'
+        title: Testing S3 storage (bucket from conftest.py)
+        use_blob_urls: true
+        presign_ttl: 3600
+        recursive_scan: true
+      method: POST
+      url: '{django_live_url}/api/storages/s3'
+    response:
+      save:
+        json:
+          storage_pk: id
+      status_code: 201
+
+  - name: Sync S3 storage
+    request:
+      method: POST
+      url: '{django_live_url}/api/storages/s3/{storage_pk}/sync'
+    response:
+      json:
+        last_sync_count: 4
+      status_code: 200
+
+  - name: setup_views
+    request:
+      method: POST
+      url: '{django_live_url}/api/dm/views/?project={project_pk}'
+      json: {
+        "data": {
+          "filters": {},
+          "ordering": [
+            "tasks:storage_filename"
+          ]
+        },
+        "project": !int "{project_pk}"
+      }
+    response:
+      save:
+        json:
+          view: "@"
+      status_code: 201
+
+  - name: get_tasks
+    request:
+      method: GET
+      url: '{django_live_url}/api/tasks?fields=all&view={view.id}'
+    response:
+      status_code: 200
+      json: {
+        "total_annotations": 0,
+        "total_predictions": 0,
+        "total": 4,
+        "tasks": [
+        {
+          "storage_filename": "image1.jpg",
+          "project": !int "{project_pk}"
+        },
+        {
+          "storage_filename": "subdir/another/image2.jpg",
+          "project": !int "{project_pk}"
+        },
+        {
+          "storage_filename": "subdir/image1.jpg",
+          "project": !int "{project_pk}"
+        },
+        {
+          "storage_filename": "subdir/image2.jpg",
+          "project": !int "{project_pk}"
+        }
+        ]
+      }
+
+---
+
+test_name: tasks-storage-filename-local
+strict: false
+marks:
+  - skipif: '"Windows" in platform.system()'
+  - usefixtures:
+    - django_live_url
+    - local_files_storage
+    - local_files_document_root_tempdir
+stages:
+
+  - id: signup
+    name: Sign up
+    request:
+      url: "{django_live_url}/user/signup"
+      data:
+        email: test_suites_user@heartex.com
+        password: 12345678
+      method: POST
+    response:
+      status_code: 302
+      save:
+        $ext:
+          function: tests.utils:os_independent_path
+          extra_kwargs:
+            path: 'files/subdir/test_image2.png'
+            add_tempdir: true
+
+  - id: create_project
+    name: create_project
+    request:
+      data:
+        title: Test Draft 1
+        show_collab_predictions: true
+        label_config: '<View><Text name="text" value="$text"/><Choices name="text_class" toName="text"><Choice value="class_A"/><Choice value="class_B"/><Choice value="class_TESTING"/><Choice value="class_PREDICTIONS_TESTING"/></Choices></View>'
+      method: POST
+      url: '{django_live_url}/api/projects'
+    response:
+      save:
+        json:
+          project_pk: id
+          created_by: created_by.id
+      status_code: 201
+
+  - name: create local storage
+    request:
+      json:
+        project: "{project_pk}"
+        title: test
+        regex_filter: ".*png"
+        path: "{os_independent_path_parent}"
+        use_blob_urls: true
+      method: POST
+      url: '{django_live_url}/api/storages/localfiles'
+    response:
+      save:
+        json:
+          storage_pk: id
+      status_code: 201
+
+  - name: sync local storage
+    request:
+      method: POST
+      url: '{django_live_url}/api/storages/localfiles/{storage_pk}/sync'
+    response:
+      json:
+        last_sync_count: 1
+      status_code: 200
+
+  - name: setup_views
+    request:
+      method: POST
+      url: '{django_live_url}/api/dm/views/?project={project_pk}'
+      json: {
+        "data": {
+          "filters":{
+            "conjunction": "and",
+            "items": [{
+              "filter": "filter:tasks:storage_filename",
+              "operator": "contains",
+              "type": "String",
+              "value": ".png"
+            }]
+          },
+          "ordering": []
+        },
+        "project": !int "{project_pk}"
+      }
+    response:
+      save:
+        json:
+          view: "@"
+      status_code: 201
+
+  - name: get_tasks
+    request:
+      method: GET
+      url: '{django_live_url}/api/tasks?fields=all&view={view.id}'
+    response:
+      status_code: 200
+      json: {
+        "total_annotations": 0,
+        "total_predictions": 0,
+        "total": 1,
+        "tasks": [
+        {
+          "storage_filename": "/tmp/files/subdir/test_image2.png",
+          "project": !int "{project_pk}"
+        }
+        ]
+      }
+
+---
+
+# See FilterSerializer; test logic preventing exploit that traverses the ORM
+# to leak sensitive data character-by-character
+test_name: tasks_api_filter_security_restrictions
+strict: false
+marks:
+- usefixtures:
+  - django_live_url
+stages:
+
+- id: signup
+  type: ref
+
+- id: create_project
+  name: create_project
+  request:
+    data:
+      title: Test Draft 1
+      show_collab_predictions: true
+      label_config: '<View><Text name="text" value="$text"/><Choices name="text_class" toName="text"><Choice value="class_A"/><Choice value="class_B"/><Choice value="class_TESTING"/><Choice value="class_PREDICTIONS_TESTING"/></Choices></View>'
+    method: POST
+    url: '{django_live_url}/api/projects'
+  response:
+    save:
+      json:
+        project_pk: id
+        created_by: created_by.id
+    status_code: 201
+
+- name: create view with exploit filter should fail
+  request:
+    method: POST
+    url: '{django_live_url}/api/dm/views'
+    json:
+      project: '{project_pk}'
+      data:
+        filters:
+          conjunction: and
+          items:
+            - filter: "filter:tasks:updated_by__sensitive_field"
+              operator: empty
+              value: "true"
+              type: String
+  response:
+    status_code: 400
+    json:
+      validation_errors:
+        filter_group:
+          filters:
+            - column:
+              - '"__" is not generally allowed in filters. Consider asking your administrator to add "updated_by__sensitive_field" to DATA_MANAGER_FILTER_ALLOWLIST, but note that some filter expressions may pose a security risk'
+
+- name: create view with allowlisted filter should succeed
+  request:
+    method: POST
+    url: '{django_live_url}/api/dm/views'
+    json:
+      project: '{project_pk}'
+      data:
+        filters:
+          conjunction: and
+          items:
+            - filter: "filter:tasks:updated_by__active_organization"
+              operator: empty
+              value: "true"
+              type: String
+  response:
+    status_code: 201
+    save:
+      json:
+        view_pk: id
+
+- name: change filter to typical column succeeds
+  request:
+    method: PUT
+    url: '{django_live_url}/api/dm/views/{view_pk}?interaction=filter&project={project_pk}'
+    json:
+      project: '{project_pk}'
+      data:
+        filters:
+          conjunction: and
+          items:
+            - filter: "filter:tasks:updated_by"
+              operator: empty
+              value: "true"
+              type: String
+  response:
+    status_code: 200
+
+- name: change filter to unexpected prefix fails
+  request:
+    method: PUT
+    url: '{django_live_url}/api/dm/views/{view_pk}?interaction=filter&project={project_pk}'
+    json:
+      project: '{project_pk}'
+      data:
+        filters:
+          conjunction: and
+          items:
+            - filter: "tasks:filter:annotations_results"
+              operator: empty
+              value: "true"
+              type: String
+  response:
+    status_code: 400
+    json:
+      validation_errors:
+        filter_group:
+          filters:
+            - column:
+              - 'Filter "tasks:filter:annotations_results" should start with "filter:tasks:"'
+
+- name: change filter to include direction marker succeeds
+  request:
+    method: PUT
+    url: '{django_live_url}/api/dm/views/{view_pk}?interaction=filter&project={project_pk}'
+    json:
+      project: '{project_pk}'
+      data:
+        filters:
+          conjunction: and
+          items:
+            - filter: "filter:tasks:-annotations_results"
+              operator: empty
+              value: "true"
+              type: String
+  response:
+    status_code: 200
+
+- name: invalid filter with direction marker fails, but suggests correct allowlist
+  request:
+    method: PUT
+    url: '{django_live_url}/api/dm/views/{view_pk}?interaction=filter&project={project_pk}'
+    json:
+      project: '{project_pk}'
+      data:
+        filters:
+          conjunction: and
+          items:
+            - filter: "filter:tasks:-updated_by__sensitive_field"
+              operator: empty
+              value: "true"
+              type: String
+  response:
+    status_code: 400
+    json:
+      validation_errors:
+        filter_group:
+          filters:
+            - column:
+              - '"__" is not generally allowed in filters. Consider asking your administrator to add "updated_by__sensitive_field" to DATA_MANAGER_FILTER_ALLOWLIST, but note that some filter expressions may pose a security risk'
+
+- name: change filter to dotted data field with underscores succeeds
+  request:
+    method: PUT
+    url: '{django_live_url}/api/dm/views/{view_pk}?interaction=filter&project={project_pk}'
+    json:
+      project: '{project_pk}'
+      data:
+        filters:
+          conjunction: and
+          items:
+            - filter: "filter:tasks:data.images__0"
+              operator: empty
+              value: "true"
+              type: String
+  response:
+    status_code: 200
+
+- name: change filter to valid column without prefix fails
+  request:
+    method: PUT
+    url: '{django_live_url}/api/dm/views/{view_pk}?interaction=filter&project={project_pk}'
+    json:
+      project: '{project_pk}'
+      data:
+        filters:
+          conjunction: and
+          items:
+            - filter: "annotations_results"
+              operator: empty
+              value: "true"
+              type: String
+  response:
+    status_code: 400
+    json:
+      validation_errors:
+        filter_group:
+          filters:
+            - column:
+              - 'Filter "annotations_results" should start with "filter:tasks:"'
+
+---
+
+# Regression test preventing replace-all of prefixes from being used to construct exploit filters
+test_name: tasks_api_prevent_prefix_regression
+strict: false
+marks:
+- usefixtures:
+  - django_live_url
+stages:
+
+- id: signup
+  type: ref
+
+- id: create_project
+  name: create_project
+  request:
+    data:
+      title: Test Draft 1
+      show_collab_predictions: true
+      label_config: '<View><Text name="text" value="$text"/><Choices name="text_class" toName="text"><Choice value="class_A"/><Choice value="class_B"/><Choice value="class_TESTING"/><Choice value="class_PREDICTIONS_TESTING"/></Choices></View>'
+    method: POST
+    url: '{django_live_url}/api/projects'
+  response:
+    save:
+      json:
+        project_pk: id
+        created_by: created_by.id
+    status_code: 201
+
+# Perhaps our validation should be further improved, but for now, it's
+# garbage in, garbage out.
+- name: create view with prefix in middle of filter should succeed
+  request:
+    method: POST
+    url: '{django_live_url}/api/dm/views'
+    json:
+      project: '{project_pk}'
+      data:
+        filters:
+          conjunction: and
+          items:
+            # in an earlier version, preprocess_field_name would have
+            # transformed this to updated_by__sensitive_field
+            - filter: "filter:tasks:updated_by_tasks:_sensitive_field"
+              operator: empty
+              value: "true"
+              type: String
+  response:
+    status_code: 201
+    save:
+      json:
+        view_pk: id
+
+- name: get_tasks fails because "updated_by_tasks:_sensitive_field" doesn't resolve to a field
+  request:
+    method: GET
+    url: '{django_live_url}/api/tasks?view={view_pk}'
+  response:
+    # 500 actually expected here
+    status_code: 500

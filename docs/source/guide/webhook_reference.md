@@ -1,10 +1,16 @@
 ---
 title: Webhook event format reference 
-short: Webhooks Event Reference
+short: Webhook event reference
 type: guide
-order: 653
+tier: all
+order: 413
+order_enterprise: 413
 meta_title: Label Studio Webhook Event Reference 
 meta_description: Label Studio reference documentation for webhook event fields and payloads sent from Label Studio for integration with your machine learning pipeline. 
+section: "Integrate & Extend"
+parent: "webhooks"
+parent_enterprise: "webhooks"
+
 ---
 
 Label Studio includes several types of webhook events that trigger when specific actions occur. Refer to the details on this page to determine what information is included in the payload of each webhook event. For details about how to use webhooks and to set up webhooks in Label Studio, see [Set up webhooks in Label Studio](webhooks.html). To create your own webhooks in Label Studio to trigger events when specific actions happen, see [Create custom events for webhooks in Label Studio](webhook_create.html). 
@@ -61,7 +67,7 @@ The webhook payload includes the name of the action and some additional task dat
         {
             "id": 21,
             "data": {
-                "ner": "Opossums like to be aloft \n\n\n\n\n\nin trees."
+                "ner": "Opossums like to be aloft \n\n\n\n\n\n in trees."
             },
             "meta": {},
             "created_at": "2021-08-17T13:51:02.590839Z",
@@ -123,7 +129,6 @@ The webhook payload includes the name of the action and some additional task dat
         "created_at": "2021-08-17T13:49:34.326416Z",
         "updated_at": "2021-08-17T13:49:35.911271Z",
         "sampling": "Sequential sampling",
-        "show_ground_truth_first": true,
         "show_overlap_first": true,
         "overlap_cohort_percentage": 100,
         "task_data_login": null,
@@ -213,7 +218,6 @@ Sent when a task is deleted from Label Studio. See how to [set up a webhook for 
         "created_at": "2021-08-17T13:49:34.326416Z",
         "updated_at": "2021-08-17T13:52:09.334425Z",
         "sampling": "Sequential sampling",
-        "show_ground_truth_first": true,
         "show_overlap_first": true,
         "overlap_cohort_percentage": 100,
         "task_data_login": null,
@@ -322,7 +326,6 @@ The webhook payload includes the name of the action and some additional annotati
         "created_at": "2021-08-17T13:49:34.326416Z",
         "updated_at": "2021-08-17T13:52:09.334425Z",
         "sampling": "Sequential sampling",
-        "show_ground_truth_first": true,
         "show_overlap_first": true,
         "overlap_cohort_percentage": 100,
         "task_data_login": null,
@@ -457,7 +460,6 @@ The webhook payload includes the name of the action and some additional annotati
         "created_at": "2021-08-12T14:15:01.744507Z",
         "updated_at": "2021-08-17T13:35:25.697471Z",
         "sampling": "Sequential sampling",
-        "show_ground_truth_first": true,
         "show_overlap_first": true,
         "overlap_cohort_percentage": 100,
         "task_data_login": null,
@@ -532,7 +534,6 @@ Sent when an annotation is deleted. See how to [set up a webhook for this event]
         "created_at": "2021-08-17T13:49:34.326416Z",
         "updated_at": "2021-08-17T13:52:09.334425Z",
         "sampling": "Sequential sampling",
-        "show_ground_truth_first": true,
         "show_overlap_first": true,
         "overlap_cohort_percentage": 100,
         "task_data_login": null,
@@ -597,7 +598,6 @@ The webhook payload includes the name of the action and some additional project 
         "created_at": "2021-08-17T13:55:58.809065Z",
         "updated_at": "2021-08-17T13:55:58.809098Z",
         "sampling": "Sequential sampling",
-        "show_ground_truth_first": true,
         "show_overlap_first": true,
         "overlap_cohort_percentage": 100,
         "task_data_login": null,
@@ -668,7 +668,6 @@ The webhook payload includes the name of the action and some additional project 
         "created_at": "2021-08-12T14:15:01.744507Z",
         "updated_at": "2021-08-17T13:39:14.054849Z",
         "sampling": "Sequential sampling",
-        "show_ground_truth_first": true,
         "show_overlap_first": true,
         "overlap_cohort_percentage": 100,
         "task_data_login": null,
@@ -704,5 +703,26 @@ You must [enable organization-level webhooks](webhooks.html#Enable-organization-
     }
 }
 ```
+
+
+### Start Training 
+
+This webhook is triggered when a user clicks `Start Training` button on the ML Model card in the Project Settings page.
+This event will be sent to the ML Backend and can be caught in the model.fit(event, ...) method:
+
+```
+class MyModel(LabelStudioMLBase):
+  def fit(self, event, *args, **kwargs):
+    if event == 'START_TRAINING': 
+      ...
+```
+
+### Webhook payload details
+
+| Key | Type | Description                           |
+| --- | --- |---------------------------------------| 
+| action | string | Name of the action: `START_TRAINING`. | 
+| id | integer | ID of the project where training is started. |
+| project | JSON dictionary | All fields related to the project that was updated. See the [API documentation for updating a project](/api#operation/api_projects_partial_update). |
 
 

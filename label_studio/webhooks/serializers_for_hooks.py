@@ -1,8 +1,7 @@
-from rest_framework import serializers
-
-from projects.models import Project
-from tasks.models import Task, Annotation
 from core.label_config import replace_task_data_undefined_with_config_field
+from projects.models import Project
+from rest_framework import serializers
+from tasks.models import Annotation, Task
 
 
 class OnlyIDWebhookSerializer(serializers.Serializer):
@@ -13,7 +12,6 @@ class OnlyIDWebhookSerializer(serializers.Serializer):
 
 
 class ProjectWebhookSerializer(serializers.ModelSerializer):
-
     task_number = serializers.IntegerField(read_only=True)
     finished_task_number = serializers.IntegerField(read_only=True)
     total_predictions_number = serializers.IntegerField(read_only=True)

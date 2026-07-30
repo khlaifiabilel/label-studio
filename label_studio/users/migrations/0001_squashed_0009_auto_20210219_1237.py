@@ -11,12 +11,13 @@ from rest_framework.authtoken.models import Token
 
 
 def add_tokens(apps, schema_editor):
+    db_alias = schema_editor.connection.alias
     User = apps.get_model('users', 'User')
-    all_users = User.objects.all()
+    all_users = User.objects.using(db_alias).all()
 
     for user_one in all_users:
         if not hasattr(user_one, 'auth_token'):
-            Token.objects.create(user=user_one)
+            Token.objects.using(db_alias).create(user=user_one)
 
 
 class Migration(migrations.Migration):
@@ -67,9 +68,6 @@ class Migration(migrations.Migration):
                 'verbose_name_plural': 'users',
                 'db_table': 'htx_user',
             },
-            managers=[
-                ('objects', users.models.UserManager()),
-            ],
         ),
         migrations.RunPython(add_tokens),
         # migrations.RunPython(add_users),  # TODO: flag:ent

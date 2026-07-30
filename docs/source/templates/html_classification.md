@@ -3,7 +3,7 @@ title: HTML Classification
 type: templates
 category: Structured Data Parsing
 cat: structured-data-parsing
-order: 605
+order: 520
 meta_title: HTML Classification Data Labeling Template
 meta_description: Template for classifying HTML documents with Label Studio for your machine learning and data science projects.
 ---
@@ -36,7 +36,6 @@ For content moderation and other use cases where you want to classify HTML conte
   </View>
 </View>
 ```
-
 ## About the labeling configuration
 
 All labeling configurations must be wrapped in [View](/tags/view.html) tags.

@@ -1,57 +1,59 @@
 ---
-title: Install Label Studio Enterprise on-premises using Docker
-short: Install with Docker
-badge: <i class='ent'/></i>
+title: Install Label Studio Enterprise On-premises using Docker Compose
+short: Install using Docker
 type: guide
-order: 215
+tier: enterprise
+order: 0
+order_enterprise: 75
 meta_title: Install Label Studio Enterprise on-premises using Docker
 meta_description: Install, back up, and upgrade Label Studio Enterprise with Docker to create machine learning and data science projects on-premises.
+section: "Install & Setup"
+parent_enterprise: "install_enterprise"
 ---
 
 Install Label Studio Enterprise on-premises if you need to meet strong privacy regulations, legal requirements, or want to manage a custom installation on your own infrastructure using Docker or public cloud. If you want to use a different installation method:
 - You can use Kubernetes and Helm to deploy Label Studio Enterprise in the cloud. See [Deploy Label Studio Enterprise on Kubernetes](install_enterprise_k8s.html).
-- You can run Label Studio Enterprise in an airgapped environment, and no data leaves your infrastructure. See [Install Label Studio Enterprise without public internet access](install_enterprise_airgapped.html).
+- You can run Label Studio Enterprise in an airgapped environment, and no data leaves your infrastructure. See [Install Label Studio Enterprise without public internet access](install_k8s_airgapped).
 
 See [Secure Label Studio](security.html) for more details about security and hardening for Label Studio Enterprise.
 
-<div class="enterprise"><p>
-To install Label Studio Community Edition, see <a href="install.html">Install and Upgrade Label Studio</a>. This page is specific to the Enterprise version of Label Studio.
-</p></div>
+!!! note
+    Docker deployments are more suitable for proof-of-concept builds and small projects. For production environments and larger deployments, we strongly recommend using Kubernetes. Kubernetes deployments provide better scalability, reliability, and access to advanced features such as Prompts. See [Deploy Label Studio Enterprise on Kubernetes](install_enterprise_k8s.html) for more information.
 
-<!-- md deploy.md -->
+To install Label Studio Community Edition, see [Install Label Studio](https://labelstud.io/guide/install). This page is specific to the Enterprise version of Label Studio.
+
+!!! note
+    On-prem deployments of Label Studio Enterprise are not supported for Academic licenses.  
+
+{% insertmd includes/deploy.md %}
 
 ## Install Label Studio Enterprise using Docker
 
-1. Pull the latest image.
+1. Log in to a Docker registry.
 2. Add the license file.
 3. Start the server using Docker Compose.
 
 ### Prerequisites
-Make sure you have an authorization token to retrieve Docker images and a current license file. If you are a Label Studio Enterprise customer and do not have access, [contact us](mailto:hello@heartex.ai) to receive an authorization token and a copy of your license file.
+Make sure you have an authorization token to retrieve Docker images and a current license file. If you are a Label Studio Enterprise customer and do not have access, [email support](mailto:support@humansignal.com) or open a ticket through our [support portal](https://support.humansignal.com/) to receive an authorization token and a copy of your license file.
 
 Make sure [Docker Compose](https://docs.docker.com/compose/install/) is installed on your system.
 
 After you install Label Studio Enterprise, the app is automatically connected to the following running services:
-- PostgresSQL (versions 11, 12, 13)
-- Redis (version 5)
+- PostgresSQL (versions >=13)
+- Redis (version >=6.0)
 
-### Pull the latest image
+### Log in to a Docker registry
 
 You must be authorized to access Label Studio Enterprise images. 
 
-1. Set up the Docker login to retrieve the latest Docker image:
+Set up the Docker login to retrieve the latest Docker image:
 ```bash
 docker login --username heartexlabs
 ```
 When prompted to enter the password, enter the token. If login succeeds, a `~/.docker/config.json` file is created with the authorization settings.  
 
-> If you have default registries specified when logging into Docker, you might need to explicitly specify the registry: `docker  login --username heartexlabs docker.io`.
-
-2. Pull the latest Label Studio Enterprise image:
-```bash
-docker pull heartexlabs/label-studio-enterprise:latest
-```
-> Note: You might need to use `sudo` to log in or pull images.
+!!! note 
+    If you have default registries specified when logging into Docker, you might need to explicitly specify the registry: `docker login --username heartexlabs docker.io`.
 
 ### Add the license file 
 After you retrieve the latest Label Studio Enterprise image, add the license file. You can't start the Docker image without a license file. 
@@ -70,7 +72,6 @@ To run Label Studio Enterprise in production, start it using [Docker compose](ht
 1. Create a file, `label-studio-enterprise/env.list` with the required environment variables:
 ```
 # Specify the path to the license file. 
-# Alternatively, it can be a URL like LICENSE=https://lic.heartex.ai/db/20210203-1234-ab123456.lic
 LICENSE=/label-studio-enterprise/license.txt
 
 # Specify the FQDN name with port if differs from 80
@@ -139,26 +140,36 @@ REDIS_LOCATION=redis://redis:6379/1
 2. After you set all the environment variables, create the following `docker-compose.yml`:
 
 ```yaml
-version: '3.3'
+version: '3.8'
 
 services:
-  app:
+  nginx:
     image: heartexlabs/label-studio-enterprise:VERSION
     ports:
       - "80:8085"
       - "443:8086"
-    expose:
-      - "80"
-      - "443"
+    depends_on:
+      - app
+    restart: on-failure
     env_file:
       - env.list
+    command: nginx
     volumes:
-      - ./mydata:/label-studio/data:rw
-      - ./license.txt:/label-studio-enterprise/license.txt:ro
       - ./certs:/certs:ro
     working_dir: /label-studio-enterprise
 
-  rqworkers:
+  app:
+    image: heartexlabs/label-studio-enterprise:VERSION
+    restart: on-failure
+    env_file:
+      - env.list
+    command: label-studio-uwsgi
+    volumes:
+      - ./mydata:/label-studio/data:rw
+      - ./license.txt:/label-studio-enterprise/license.txt:ro
+    working_dir: /label-studio-enterprise
+
+  rqworkers_low:
     image: heartexlabs/label-studio-enterprise:VERSION
     depends_on:
       - app
@@ -168,7 +179,43 @@ services:
       - ./mydata:/label-studio/data:rw
       - ./license.txt:/label-studio-enterprise/license.txt:ro
     working_dir: /label-studio-enterprise
-    command: [ "python3", "/label-studio-enterprise/label_studio_enterprise/manage.py", "rqworker", "default" ]
+    command: [ "python3", "/label-studio-enterprise/label_studio_enterprise/manage.py", "rqworker", "--with-scheduler", "low" ]
+
+  rqworkers_default:
+    image: heartexlabs/label-studio-enterprise:VERSION
+    depends_on:
+      - app
+    env_file:
+      - env.list
+    volumes:
+      - ./mydata:/label-studio/data:rw
+      - ./license.txt:/label-studio-enterprise/license.txt:ro
+    working_dir: /label-studio-enterprise
+    command: [ "python3", "/label-studio-enterprise/label_studio_enterprise/manage.py", "rqworker", "--with-scheduler", "default" ]
+
+  rqworkers_high:
+    image: heartexlabs/label-studio-enterprise:VERSION
+    depends_on:
+      - app
+    env_file:
+      - env.list
+    volumes:
+      - ./mydata:/label-studio/data:rw
+      - ./license.txt:/label-studio-enterprise/license.txt:ro
+    working_dir: /label-studio-enterprise
+    command: [ "python3", "/label-studio-enterprise/label_studio_enterprise/manage.py", "rqworker", "--with-scheduler", "high"]
+
+  rqworkers_critical:
+    image: heartexlabs/label-studio-enterprise:VERSION
+    depends_on:
+      - app
+    env_file:
+      - env.list
+    volumes:
+      - ./mydata:/label-studio/data:rw
+      - ./license.txt:/label-studio-enterprise/license.txt:ro
+    working_dir: /label-studio-enterprise
+    command: [ "python3", "/label-studio-enterprise/label_studio_enterprise/manage.py", "rqworker", "--with-scheduler", "critical" ]
 ```
 
 3. Run Docker Compose:
@@ -177,7 +224,8 @@ services:
 docker-compose up
 ```
 
-> Note: If you expose port 80, you must start Docker with `sudo`.
+!!! note 
+    If you expose port 80, you must start Docker with `sudo`.
 
 ### Get the Docker image version
 
@@ -186,6 +234,6 @@ To check the version of the Label Studio Enterprise Docker image, use the [`dock
 From the command line, run the following as root or using `sudo` and review the output:
 ```bash
 $ docker ps
-03b88eebdb65   heartexlabs/label-studio-enterprise:latest   "uwsgi --ini deploy/…"   36 hours ago   Up 36 hours   0.0.0.0:80->8000/tcp   label-studio-enterprise_app_1
+03b88eebdb65   heartexlabs/label-studio-enterprise:2.2.8-1   "uwsgi --ini deploy/…"   36 hours ago   Up 36 hours   0.0.0.0:80->8000/tcp   label-studio-enterprise_app_1
 ```
-In this example output, the image column displays the Docker image and version number. The image `heartexlabs/label-studio-enterprise:latest` is using the version `latest`.
+In this example output, the image column displays the Docker image and version number. The image `heartexlabs/label-studio-enterprise:2.2.8-1` is using the version `2.2.8-1`.

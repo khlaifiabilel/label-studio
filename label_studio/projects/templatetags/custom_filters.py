@@ -1,5 +1,5 @@
-"""This file and its contents are licensed under the Apache License 2.0. Please see the included NOTICE for copyright information and LICENSE for a copy of the license.
-"""
+"""This file and its contents are licensed under the Apache License 2.0. Please see the included NOTICE for copyright information and LICENSE for a copy of the license."""
+
 from django import template
 
 register = template.Library()
@@ -15,7 +15,7 @@ def seconds_to_pretty_time(value, show_seconds=False):
             return f'{value} second' + ('s' if value > 1 else '')
         return '< 1 minute'
     if value < 3600:
-        m = int(value / 60.)
+        m = int(value / 60.0)
         if m == 1:
             return '1 minute'
         else:

@@ -3,7 +3,7 @@ title: Speaker Diarization
 type: templates
 category: Audio/Speech Processing
 cat: audio-speech-processing
-order: 304
+order: 325
 meta_title: Speaker Diarization (Segmentation) Data Labeling Template
 meta_description: Template for segmenting an audio clip based on speaker with Label Studio for your machine learning and data science projects.
 ---
@@ -11,6 +11,11 @@ meta_description: Template for segmenting an audio clip based on speaker with La
 <img src="/images/templates/speaker-segmentation.png" alt="" class="gif-border" width="552px" height="408px" />
 
 When preparing audio transcripts or training a machine learning model to differentiate between different speakers, use this template to perform speaker segmentation and label different regions of an audio clip with different speakers. 
+
+!!! error Enterprise
+    If you're managing more complex or high-volume audio labeling projects, Label Studio Enterprise includes an advanced audio transcription interface built to support faster, more precise annotation at scale.
+
+    See our new [Multi-Channel Audio Transcription](react_audio) template and learn more in [A New Audio Transcription UI for Speed and Quality at Scale](https://humansignal.com/blog/building-a-better-ui-for-audio-transcription-at-scale/) (blog post).
 
 ## Interactive Template Preview
 
@@ -24,7 +29,7 @@ When preparing audio transcripts or training a machine learning model to differe
     <Label value="Speaker one" background="#00FF00"/>
     <Label value="Speaker two" background="#12ad59"/>
   </Labels>
-  <AudioPlus name="audio" value="$audio" />
+  <Audio name="audio" value="$audio" />
 </View>
 ```
 
@@ -40,13 +45,13 @@ Use the [Labels](/tags/labels.html) control tag to allow annotators to highlight
 </Labels>
 ```
 
-Use the [AudioPlus](/tags/audioplus.html) object tag to display a waveform of audio and allow annotators to change the speed of the audio playback:
+Use the [Audio](/tags/audio.html) object tag to display a waveform of audio and allow annotators to change the speed of the audio playback:
 ```xml
-<AudioPlus name="audio" value="$audio" />
+<Audio name="audio" value="$audio" />
 ```
 
 ## Related tags
 
 - [Labels](/tags/labels.html)
-- [AudioPlus](/tags/audioplus.html)
+- [Audio](/tags/audio.html)
 

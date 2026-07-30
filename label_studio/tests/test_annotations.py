@@ -1,15 +1,15 @@
-"""This file and its contents are licensed under the Apache License 2.0. Please see the included NOTICE for copyright information and LICENSE for a copy of the license.
-"""
-import pytest
-import json
-import requests_mock
-import math
+"""This file and its contents are licensed under the Apache License 2.0. Please see the included NOTICE for copyright information and LICENSE for a copy of the license."""
 
+import json
+
+import pytest
+import requests_mock
 from django.apps import apps
 from django.urls import reverse
-from tasks.models import Task, Annotation
 from projects.models import Project
-from .utils import invite_client_to_project, _client_is_annotator
+from tasks.models import Annotation, Task
+
+from .utils import _client_is_annotator, invite_client_to_project
 
 
 @pytest.fixture
@@ -22,11 +22,29 @@ def configured_project_min_annotations_1(configured_project):
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize('result, logtext, ml_upload_called', [
-    (json.dumps([{'from_name': 'text_class', 'to_name': 'text', 'type': 'labels', 'value': {'labels': ['class_A'], 'start': 0, 'end': 1}}]), None, True),
-    (json.dumps([]), None, True),
-])
-def test_create_annotation(caplog, any_client, configured_project_min_annotations_1, result, logtext, ml_upload_called):
+@pytest.mark.parametrize(
+    'result, logtext, ml_upload_called',
+    [
+        (
+            json.dumps(
+                [
+                    {
+                        'from_name': 'text_class',
+                        'to_name': 'text',
+                        'type': 'labels',
+                        'value': {'labels': ['class_A'], 'start': 0, 'end': 1},
+                    }
+                ]
+            ),
+            None,
+            True,
+        ),
+        (json.dumps([]), None, True),
+    ],
+)
+def test_create_annotation(
+    caplog, any_client, configured_project_min_annotations_1, result, logtext, ml_upload_called
+):
     task = Task.objects.first()
     if _client_is_annotator(any_client):
         assert invite_client_to_project(any_client, task.project).status_code == 200
@@ -47,9 +65,11 @@ def test_create_annotation(caplog, any_client, configured_project_min_annotation
         # annotator client
         if hasattr(any_client, 'annotator') and any_client.annotator is not None:
             assert annotation.completed_by.id == any_client.user.id
+            assert annotation.updated_by.id == any_client.user.id
         # business client
         else:
             assert annotation.completed_by.id == any_client.business.admin.id
+            assert annotation.updated_by.id == any_client.business.admin.id
 
         if apps.is_installed('businesses'):
             assert annotation.task.accuracy == 1.0
@@ -60,7 +80,6 @@ def test_create_annotation(caplog, any_client, configured_project_min_annotation
 
 @pytest.mark.django_db
 def test_create_annotation_with_ground_truth(caplog, any_client, configured_project_min_annotations_1):
-
     task = Task.objects.first()
     client_is_annotator = _client_is_annotator(any_client)
     if client_is_annotator:
@@ -69,13 +88,17 @@ def test_create_annotation_with_ground_truth(caplog, any_client, configured_proj
     webhook_called = not client_is_annotator
     ground_truth = {
         'task': task.id,
-        'result': json.dumps([{'from_name': 'text_class', 'to_name': 'text', 'value': {'labels': ['class_A'], 'start': 0, 'end': 1}}]),
-        'ground_truth': True
+        'result': json.dumps(
+            [{'from_name': 'text_class', 'to_name': 'text', 'value': {'labels': ['class_A'], 'start': 0, 'end': 1}}]
+        ),
+        'ground_truth': True,
     }
 
     annotation = {
         'task': task.id,
-        'result': json.dumps([{'from_name': 'text_class', 'to_name': 'text', 'value': {'labels': ['class_B'], 'start': 0, 'end': 1}}])
+        'result': json.dumps(
+            [{'from_name': 'text_class', 'to_name': 'text', 'value': {'labels': ['class_B'], 'start': 0, 'end': 1}}]
+        ),
     }
 
     with requests_mock.Mocker() as m:
@@ -93,12 +116,15 @@ def test_create_annotation_with_ground_truth(caplog, any_client, configured_proj
         assert m.called
         task = Task.objects.get(id=task.id)
         assert task.annotations.count() == 2
+        annotations = Annotation.objects.filter(task=task)
+        for a in annotations:
+            assert a.updated_by.id == any_client.user.id
 
 
 @pytest.mark.django_db
 def test_delete_annotation(business_client, configured_project):
     task = Task.objects.first()
-    annotation = Annotation.objects.create(task=task, result=[])
+    annotation = Annotation.objects.create(task=task, project=configured_project, result=[])
     assert task.annotations.count() == 1
     r = business_client.delete('/api/annotations/{}/'.format(annotation.id))
     assert r.status_code == 204
@@ -111,20 +137,31 @@ def annotations():
     return {
         'class_A': {
             'task': task.id,
-            'result': json.dumps([{'from_name': 'text_class', 'to_name': 'text', 'type': 'labels', 'value': {
-                'labels': ['class_A'], 'start': 0, 'end': 10
-            }}])
+            'result': json.dumps(
+                [
+                    {
+                        'from_name': 'text_class',
+                        'to_name': 'text',
+                        'type': 'labels',
+                        'value': {'labels': ['class_A'], 'start': 0, 'end': 10},
+                    }
+                ]
+            ),
         },
         'class_B': {
             'task': task.id,
-            'result': json.dumps([{'from_name': 'text_class', 'to_name': 'text', 'type': 'labels', 'value': {
-                'labels': ['class_B'], 'start': 0, 'end': 10
-            }}])
+            'result': json.dumps(
+                [
+                    {
+                        'from_name': 'text_class',
+                        'to_name': 'text',
+                        'type': 'labels',
+                        'value': {'labels': ['class_B'], 'start': 0, 'end': 10},
+                    }
+                ]
+            ),
         },
-        'empty': {
-            'task': task.id,
-            'result': json.dumps([])
-        }
+        'empty': {'task': task.id, 'result': json.dumps([])},
     }
 
 
@@ -135,61 +172,79 @@ def project_with_max_annotations_2(configured_project):
     configured_project.save()
 
 
-@pytest.mark.parametrize('annotations_sequence, accuracy, is_labeled', [
-    ([], None, False),
-    ([('class_A', 'business')], 1, False),
-    ([('class_A', 'annotator')], 1, False),
-    ([('class_A', 'business'), ('class_A', 'business')], 1, True),
-    ([('class_A', 'business'), ('class_A', 'annotator')], 1, True),
-    ([('class_A', 'annotator'), ('class_A', 'business')], 1, True),
-    ([('class_A', 'business'), ('class_B', 'business')], 0.5, True),
-    ([('class_A', 'business'), ('class_B', 'annotator')], 0.5, True),
-    ([('class_A', 'annotator'), ('class_B', 'business')], 0.5, True),
-    ([('empty', 'annotator'), ('empty', 'business')], 1, True),
-    ([('class_A', 'annotator'), ('empty', 'business')], 0.5, True)
-])
+@pytest.mark.parametrize(
+    'annotations_sequence, accuracy, is_labeled',
+    [
+        ([], None, False),
+        ([('class_A', 'business')], 1, False),
+        ([('class_A', 'annotator')], 1, False),
+        # Same user twice doesn't meet overlap requirement for distinct annotators
+        ([('class_A', 'business'), ('class_A', 'business')], 1, False),
+        ([('class_A', 'business'), ('class_A', 'annotator')], 1, True),
+        ([('class_A', 'annotator'), ('class_A', 'business')], 1, True),
+        # Same user twice doesn't meet overlap requirement for distinct annotators
+        ([('class_A', 'business'), ('class_B', 'business')], 0.5, False),
+        ([('class_A', 'business'), ('class_B', 'annotator')], 0.5, True),
+        ([('class_A', 'annotator'), ('class_B', 'business')], 0.5, True),
+        ([('empty', 'annotator'), ('empty', 'business')], 1, True),
+        ([('class_A', 'annotator'), ('empty', 'business')], 0.5, True),
+    ],
+)
 @pytest.mark.django_db
 def test_accuracy(
-        business_client, annotator_client, project_with_max_annotations_2, annotations, annotations_sequence,
-        accuracy, is_labeled
+    business_client,
+    annotator_client,
+    project_with_max_annotations_2,
+    annotations,
+    annotations_sequence,
+    accuracy,
+    is_labeled,
 ):
-    client = {
-        'business': business_client,
-        'annotator': annotator_client
-    }
+    client = {'business': business_client, 'annotator': annotator_client}
     task_id = next(iter(annotations.values()))['task']
     task = Task.objects.get(id=task_id)
     invite_client_to_project(annotator_client, task.project)
 
     for annotation_key, client_key in annotations_sequence:
         r = client[client_key].post(
-            reverse('tasks:api:task-annotations', kwargs={'pk': task_id}), data=annotations[annotation_key])
+            reverse('tasks:api:task-annotations', kwargs={'pk': task_id}), data=annotations[annotation_key]
+        )
         assert r.status_code == 201
     task = Task.objects.get(id=task_id)
     assert task.is_labeled == is_labeled
 
 
 @pytest.mark.django_db
-def test_accuracy_on_delete(business_client, project_with_max_annotations_2, annotations):
+def test_accuracy_on_delete(business_client, annotator_client, project_with_max_annotations_2, annotations):
     task_id = next(iter(annotations.values()))['task']
-    for annotation in annotations.values():
-        business_client.post(reverse('tasks:api:task-annotations', kwargs={'pk': task_id}), data=annotation)
+    task = Task.objects.get(id=task_id)
+    invite_client_to_project(annotator_client, task.project)
+
+    # Create annotations from two different users to meet overlap=2 with distinct annotators
+    annotation_list = list(annotations.values())
+    business_client.post(reverse('tasks:api:task-annotations', kwargs={'pk': task_id}), data=annotation_list[0])
+    business_client.post(reverse('tasks:api:task-annotations', kwargs={'pk': task_id}), data=annotation_list[1])
+    annotator_client.post(reverse('tasks:api:task-annotations', kwargs={'pk': task_id}), data=annotation_list[2])
 
     task = Task.objects.get(id=task_id)
     assert task.annotations.count() == len(annotations)
-    assert task.is_labeled
+    assert task.is_labeled  # 2 distinct annotators >= overlap of 2
+
     annotation_ids = [c.id for c in task.annotations.all()]
+    # Delete one of business_client's annotations - still have 2 distinct annotators
     r = business_client.delete(reverse('tasks:api-annotations:annotation-detail', kwargs={'pk': annotation_ids[0]}))
     assert r.status_code == 204
     task = Task.objects.get(id=task_id)
-    assert task.is_labeled  # project.max_annotations = 2
+    assert task.is_labeled  # Still 2 distinct annotators (business + annotator)
 
-    r = business_client.delete(reverse('tasks:api-annotations:annotation-detail', kwargs={'pk': annotation_ids[1]}))
+    # Delete annotator's annotation - now only 1 distinct annotator
+    r = business_client.delete(reverse('tasks:api-annotations:annotation-detail', kwargs={'pk': annotation_ids[2]}))
     assert r.status_code == 204
     task = Task.objects.get(id=task_id)
-    assert not task.is_labeled
+    assert not task.is_labeled  # Only 1 distinct annotator < overlap of 2
 
-    r = business_client.delete(reverse('tasks:api-annotations:annotation-detail', kwargs={'pk': annotation_ids[2]}))
+    # Delete last annotation
+    r = business_client.delete(reverse('tasks:api-annotations:annotation-detail', kwargs={'pk': annotation_ids[1]}))
     assert r.status_code == 204
     task = Task.objects.get(id=task_id)
     assert not task.is_labeled

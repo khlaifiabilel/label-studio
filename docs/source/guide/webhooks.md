@@ -1,10 +1,14 @@
 ---
 title: Set up webhooks in Label Studio
-short: Webhook Setup
+short: Webhooks
 type: guide
-order: 650
+tier: all
+order: 407
+order_enterprise: 407
 meta_title: Configure Webhooks in Label Studio
-meta_description: Label Studio documentation for setting up and configuring webhooks to integrate Label Studio with your machine learning pipeline
+meta_description: Label Studio documentation for setting up and configuring webhooks to integrate Label Studio with your machine learning pipeline.
+section: "Integrate & Extend"
+
 ---
 
 Webhooks in Label Studio let you set up integrations that subscribe to certain events that occur inside Label Studio. When an event is triggered, Label Studio sends an HTTP POST request to the configured webhook URL. For example:
@@ -36,11 +40,13 @@ Limit the number of requests to your server by subscribing only to the events re
 Label Studio makes two main types of events available to integrate with webhooks: project-level task events and organization events.
 
 <table>
+<thead>
   <tr>
     <th>Event Action</th>
     <th>Details</th>
     <th>Use Case</th>
   </tr>
+  </thead>
   <tr>
     <td><a href="webhook_reference.html#Task-Created">Task Created</a></td>
     <td>For a specific project, triggers when new tasks are created. One event per import action. Bulk task creation is sent as one event.</td>
@@ -85,7 +91,7 @@ Label Studio makes two main types of events available to integrate with webhooks
 
 ### Enable organization-level webhooks
 
-To use the organization-level webhooks that trigger events for each project, you must [set an environment variable](start.html#Set-environment-variables).
+To use the organization-level webhooks that trigger events for each project, you must [set an environment variable](https://labelstud.io/guide/start#Set-environment-variables).
 ```shell
 LABEL_STUDIO_ALLOW_ORGANIZATION_WEBHOOKS=true
 ```
@@ -128,6 +134,13 @@ Webhook connections time out after 1 second. You can adjust the timeout by setti
 If the webhook URL is inaccessible by Label Studio, you can see this in a traceback in the logs. 
 
 Label Studio does not retry webhook connections that fail. You can see successful webhook deliveries in the logs in DEBUG mode. 
+
+<div class="enterprise-only">
+
+!!! note
+    On Label Studio Enterprise Cloud (SaaS), webhook responses time out after 10 seconds. If a webhook fails 50 times in a row, it is automatically disabled by the system and must be reactivated in the webhook settings. For more details, see [Webhook limits](saas.html#Webhook-limits).
+
+</div>
 
 
 

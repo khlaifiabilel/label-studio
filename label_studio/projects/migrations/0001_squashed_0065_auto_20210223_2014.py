@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('organizations', '0008_auto_20201005_1552'),
+        ('organizations', '0001_squashed_0008_auto_20201005_1552'),
         # ('tasks', '0038_delete_storagelink'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         # ('organizations', '0004_auto_20200501_1751'),
@@ -292,7 +292,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='project',
             name='title',
-            field=models.CharField(help_text='Project name, lenth is from 3 to 50 chars', max_length=50, validators=[django.core.validators.MinLengthValidator(3), django.core.validators.MaxLengthValidator(50)], verbose_name='name'),
+            field=models.CharField(help_text='Project name, length is from 3 to 50 chars', max_length=50, validators=[django.core.validators.MinLengthValidator(3), django.core.validators.MaxLengthValidator(50)], verbose_name='name'),
         ),
         migrations.AddField(
             model_name='project',
